@@ -1,9 +1,15 @@
 "use client";
 
 import { PdfData } from "@/app/types";
-import { CircularProgress } from "@mui/material";
 import { useEffect, useState } from "react";
 import { CloudOff } from "@mui/icons-material";
+import dynamic from "next/dynamic";
+import { default as ErrorComponent } from "../error";
+import Loading from "../loading";
+
+const PdfViewer = dynamic(() => import("../pdf-viewer"), {
+  ssr: false,
+});
 
 const Home = () => {
   const [pdf, setPdf] = useState<Blob>();
@@ -42,26 +48,20 @@ const Home = () => {
     fetchRequiredData();
   }, []);
 
-  if ((!pdf || !pdfData) && !isError) {
-    return (
-      <div className="flex flex-col w-full h-full justify-center items-center">
-        <CircularProgress />
-      </div>
-    );
-  }
-
   if (isError) {
     return (
-      <div className="flex flex-col w-full h-full justify-center items-center gap-6">
-        <CloudOff color="error" sx={{ scale: 2 }} />
-        <p className="text-gray-500">
-          Unfortunately we could not load your document. Please try again later.
-        </p>
-      </div>
+      <ErrorComponent
+        icon={<CloudOff color="error" sx={{ scale: 2 }} />}
+        message="Unfortunately we could not load your document. Please try again later."
+      />
     );
   }
 
-  return <div>PdfViewer</div>;
+  if (!pdf || !pdfData) {
+    return <Loading />;
+  }
+
+  return <PdfViewer pdf={pdf} pdfData={pdfData!} />;
 };
 
 export default Home;
