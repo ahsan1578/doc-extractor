@@ -1,11 +1,13 @@
-import { PdfData } from "@/app/types";
-import { useState } from "react";
+import { PdfData, Block } from "@/app/types";
+import { useMemo, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/TextLayer.css";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import Loading from "../loading";
 import { IconButton } from "@mui/material";
 import { Add, ArrowBack, ArrowForward, Remove } from "@mui/icons-material";
+import { PageCallback } from "react-pdf/dist/shared/types.js";
+import BoundingBox from "../bounding-box";
 
 type PdfViewerProps = {
   pdf: Blob;
@@ -21,10 +23,30 @@ const PdfViewer = ({ pdf, pdfData }: PdfViewerProps) => {
   const [numPages, setNumPages] = useState<number>();
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [zoomScale, setZoomScale] = useState<number>(0.9);
+  const [pageWidth, setPageWidth] = useState<number>(0);
+  const [pageHeight, setPageHeight] = useState<number>(0);
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }): void {
     setNumPages(numPages);
   }
+
+  function onPageLoadSuccess(page: PageCallback): void {
+    const viewport = page.getViewport({ scale: zoomScale });
+    setPageWidth(viewport.width);
+    setPageHeight(viewport.height);
+  }
+
+  const currentPageBlocks = useMemo(() => {
+    const blocks: Block[] = [];
+    pdfData.result.chunks.forEach((chunk) => {
+      chunk.blocks.forEach((block) => {
+        if (block.bbox.page === pageNumber) {
+          blocks.push(block);
+        }
+      });
+    });
+    return blocks;
+  }, [pageNumber, pdfData]);
 
   return (
     <div className="w-full h-full flex flex-col justify-center items-center bg-gray-100 gap-3">
@@ -32,10 +54,23 @@ const PdfViewer = ({ pdf, pdfData }: PdfViewerProps) => {
         file={pdf}
         onLoadSuccess={onDocumentLoadSuccess}
         loading={<Loading description="Loading your document..." />}
-        scale={zoomScale}
         className="w-full h-[90%] overflow-auto flex justify-center"
       >
-        <Page pageNumber={pageNumber} />
+        <div className="relative">
+          <Page
+            pageNumber={pageNumber}
+            scale={zoomScale}
+            onLoadSuccess={onPageLoadSuccess}
+          />
+          {currentPageBlocks.map((block) => (
+            <BoundingBox
+              key={`bounding-box-${block.bbox.left}-${block.bbox.top}-${block.bbox.width}-${block.bbox.height}`}
+              block={block}
+              pageWidth={pageWidth}
+              pageHeight={pageHeight}
+            />
+          ))}
+        </div>
       </Document>
       {numPages && (
         <div className="flex gap-8">
